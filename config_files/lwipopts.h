@@ -1,7 +1,7 @@
 #pragma once
 
 #include <whd_types.h>
-#include "arch/lwipopts_freertos.h"
+#include "lwipopts_freertos.h"
 
 #ifdef CUSTOM_LWIPOPTS
 #include "custom_lwipopts.h"

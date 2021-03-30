@@ -7,15 +7,15 @@
 #
 ################################################################################
 # \copyright
-# Copyright 2018-2019 Cypress Semiconductor Corporation
+# Copyright 2018-2021, Cypress Semiconductor Corporation (an Infineon company)
 # SPDX-License-Identifier: Apache-2.0
-#
+# 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-#
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
+# 
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -71,10 +71,10 @@ VERBOSE=
 #
 #    COMPONENTS=foo bar
 #
-# ... then code in directories named COMPONENT_foo and COMPONENT_bar will be 
+# ... then code in directories named COMPONENT_foo and COMPONENT_bar will be
 # added to the build
 #
-COMPONENTS=FREERTOS 4343W
+COMPONENTS=
 
 # Like COMPONENTS, but disable optional code that was enabled by default.
 DISABLE_COMPONENTS=
@@ -90,9 +90,9 @@ SOURCES=
 INCLUDES=
 
 # Add additional defines to the build process (without a leading -D).
-DEFINES=CYBSP_WIFI_CAPABLE CY_RTOS_AWARE CY_RETARGET_IO_CONVERT_LF_TO_CRLF CY_USE_LWIP AFR
+DEFINES=
 
-# Select softfp or hardfp floating point. Default is softfp. 
+# Select softfp or hardfp floating point. Default is softfp.
 VFP_SELECT=
 
 # Additional / custom C compiler flags.
@@ -128,14 +128,39 @@ endif
 endif
 endif
 
-# Additional / custom libraries to link in to the application.
-LDLIBS=
+# Path to the linker script to use (if empty, use the default linker script).
+LINKER_SCRIPT=
 
 # Custom pre-build commands to run.
 PREBUILD=
 
 # Custom post-build commands to run.
 POSTBUILD=
+
+
+################################################################################
+# Feature Configuration
+################################################################################
+# Enable or disable BLE module
+BLE_SUPPORT=0
+
+# OTA_SUPPORT needed for some AWS Demos
+OTA_SUPPORT=0
+
+# Are we using external FLASH?
+OTA_USE_EXTERNAL_FLASH:=1
+
+# Define CY_TEST_APP_VERSION_IN_TAR here to test application version
+#        in TAR archive at start of OTA image download.
+# NOTE: This requires that the version numbers here and in the header file match.
+# NOTE: This will create compile warnings such as
+#		'warning: "APP_VERSION_MAJOR" redefined'
+#
+# CY_TEST_APP_VERSION_IN_TAR=1
+#
+# APP_VERSION_MAJOR:=1
+# APP_VERSION_MINOR:=0
+# APP_VERSION_BUILD:=0
 
 
 ################################################################################
@@ -147,19 +172,18 @@ POSTBUILD=
 # This controls where automatic source code discovery looks for code.
 CY_APP_PATH=
 
-# Relative path to the "base" library. It provides the core makefile build 
+# Relative path to the "base" library. It provides the core makefile build
 # infrastructure.
-CY_BASELIB_PATH=$(CY_AFR_ROOT)/vendors/cypress/psoc6/psoc6make
+CY_BASELIB_PATH=$(CY_AFR_ROOT)/vendors/cypress/MTB/psoc6/psoc6make
 
-# Absolute path to the compiler's "bin" directory. 
+# Absolute path to the compiler's "bin" directory.
 #
 # The default depends on the selected TOOLCHAIN (GCC_ARM uses the ModusToolbox
 # IDE provided compiler by default).
 CY_COMPILER_PATH=
 
-# Include aFR configuration make file 
-include ./afr.mk
-
+# Include aFR configuration make file
+include ./make_support/afr.mk
 
 ################################################################################
 # Tools path

@@ -393,13 +393,13 @@
  *
  *  traceString chn2 = xTraceRegisterString("Channel 2");
  *  traceString fmt2 = xTraceRegisterString("X: %d, Y: %d");
- *	traceUBChannel UBCh2 = xTraceRegisterUBChannel(chn2, fmt2);
+ *  traceUBChannel UBCh2 = xTraceRegisterUBChannel(chn2, fmt2);
  *
  *  // Result in "[Channel 1] Event!"
- *	vTraceUBEvent(UBCh1);
+ *  vTraceUBEvent(UBCh1);
  *
  *  // Result in "[Channel 2] X: 23, Y: 19"
- *	vTraceUBData(UBCh2, 23, 19);
+ *  vTraceUBData(UBCh2, 23, 19);
  *
  * You can also use the other user event functions, like vTracePrintF.
  * as they are then rerouted to the UB instead of the main event buffer.

@@ -59,6 +59,12 @@
 #define pkcs11configMAX_NUM_OBJECTS      6
 
 /**
+ * @brief Maximum number of sessions that can be stored
+ * by the PKCS #11 module.
+ */
+#define pkcs11configMAX_SESSIONS                           10
+
+/**
  * @brief Set to 1 if a PAL destroy object is implemented.
  *
  * If set to 0, no PAL destroy object is implemented, and this functionality
@@ -127,5 +133,25 @@
  * @see aws_default_root_certificates.h
  */
 #define pkcs11configLABEL_ROOT_CERTIFICATE                 "Root Cert"
+
+/**
+ * @brief Set to 1 if vendor provisioned device certificate is supported
+ *
+ * If set to 0, imported certificate will be used for client authentication
+ * aws_ota_codesigner_certificate.h.
+ *
+ */
+#define pkcs11configVENDOR_DEVICE_CERTIFICATE_SUPPORTED    0
+
+#if pkcs11configVENDOR_DEVICE_CERTIFICATE_SUPPORTED
+    #define pkcs11configIMPORT_PRIVATE_KEYS_SUPPORTED      0
+    #define pkcs11configVENDOR_DEVICE_KEY_ID               (PSA_KEY_ID_VENDOR_MIN + 1)
+    #define pkcs11configVENDOR_DEVICE_CERTIFICATE_UID      (0x100)
+    #define pkcs11configVENDOR_JITP_CERTIFICATE_UID        (0x101)
+    #define pkcs11configVENDOR_JITP_STATUS_UID             (0x1)
+#else
+    #define pkcs11configVENDOR_DEVICE_CERTIFICATE_UID      (0x5)
+    #define pkcs11configVENDOR_JITP_CERTIFICATE_UID        (0x6)
+#endif
 
 #endif /* _AWS_PKCS11_CONFIG_H_ include guard. */

@@ -123,12 +123,12 @@ extern "C" {
  * Specify what version of FreeRTOS that is used (don't change unless using the
  * trace recorder library with an older version of FreeRTOS).
  *
- * TRC_FREERTOS_VERSION_7_3_OR_7_4				If using FreeRTOS v7.3.0 - v7.4.2
- * TRC_FREERTOS_VERSION_7_5_OR_7_6				If using FreeRTOS v7.5.0 - v7.6.0
- * TRC_FREERTOS_VERSION_8_X						If using FreeRTOS v8.X.X
- * TRC_FREERTOS_VERSION_9_X						If using FreeRTOS v9.X.X
+ * TRC_FREERTOS_VERSION_7_3_OR_7_4                 If using FreeRTOS v7.3.0 - v7.4.2
+ * TRC_FREERTOS_VERSION_7_5_OR_7_6                 If using FreeRTOS v7.5.0 - v7.6.0
+ * TRC_FREERTOS_VERSION_8_X                        If using FreeRTOS v8.X.X
+ * TRC_FREERTOS_VERSION_9_X                        If using FreeRTOS v9.X.X
  *****************************************************************************/
-#define TRC_CFG_FREERTOS_VERSION	TRC_FREERTOS_VERSION_9_X
+#define TRC_CFG_FREERTOS_VERSION    TRC_FREERTOS_VERSION_9_X
 
 /******************************************************************************
  * TRC_CFG_MAX_ISR_NESTING

@@ -4,23 +4,24 @@
 * Description: This file contains threads, functions, and other resources related
 * to CapSense operations.
 *
-********************************************************************************
-* Copyright (2019), Cypress Semiconductor Corporation.
-********************************************************************************
-* This software, including source code, documentation and related materials
-* (“Software”), is owned by Cypress Semiconductor Corporation or one of its
-* subsidiaries (“Cypress”) and is protected by and subject to worldwide patent
-* protection (United States and foreign), United States copyright laws and
-* international treaty provisions. Therefore, you may use this Software only
-* as provided in the license agreement accompanying the software package from
-* which you obtained this Software (“EULA”).
+*******************************************************************************
+* Copyright 2019-2021, Cypress Semiconductor Corporation (an Infineon company) or
+* an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 *
-* If no EULA applies, Cypress hereby grants you a personal, nonexclusive,
-* non-transferable license to copy, modify, and compile the Software source
-* code solely for use in connection with Cypress’s integrated circuit products.
-* Any reproduction, modification, translation, compilation, or representation
-* of this Software except as specified above is prohibited without the express
-* written permission of Cypress.
+* This software, including source code, documentation and related
+* materials ("Software") is owned by Cypress Semiconductor Corporation
+* or one of its affiliates ("Cypress") and is protected by and subject to
+* worldwide patent protection (United States and foreign),
+* United States copyright laws and international treaty provisions.
+* Therefore, you may use this Software only as provided in the license
+* agreement accompanying the software package from which you
+* obtained this Software ("EULA").
+* If no EULA applies, Cypress hereby grants you a personal, non-exclusive,
+* non-transferable license to copy, modify, and compile the Software
+* source code solely for use in connection with Cypress's
+* integrated circuit products.  Any reproduction, modification, translation,
+* compilation, or representation of this Software except as specified
+* above is prohibited without the express written permission of Cypress.
 *
 * Disclaimer: THIS SOFTWARE IS PROVIDED AS-IS, WITH NO WARRANTY OF ANY KIND,
 * EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, NONINFRINGEMENT, IMPLIED
@@ -30,11 +31,12 @@
 * Software or any product or circuit described in the Software. Cypress does
 * not authorize its products for use in any products where a malfunction or
 * failure of the Cypress product may reasonably be expected to result in
-* significant property damage, injury or death (“High Risk Product”). By
-* including Cypress’s product in a High Risk Product, the manufacturer of such
-* system or application assumes all risk of such use and in doing so agrees to
-* indemnify Cypress against all liability.
-*****************************************​**************************************/
+* significant property damage, injury or death ("High Risk Product"). By
+* including Cypress's product in a High Risk Product, the manufacturer
+* of such system or application assumes all risk of such use and in doing
+* so agrees to indemnify Cypress against all liability.
+*******************************************************************************/
+
 #include "cyhal.h"
 #include "cybsp.h"
 #include "FreeRTOS.h"
@@ -48,29 +50,11 @@
 /*******************************************************************************
  * Defines
  ******************************************************************************/
-/* CSD EzI2C configuration resources */
-#define CSD_COMM_HW                 (SCB3)
-#define CSD_COMM_IRQ                (scb_3_interrupt_IRQn)
-#define CSD_COMM_PCLK               (PCLK_SCB3_CLOCK)
-#define CSD_COMM_CLK_DIV_HW         (CY_SYSCLK_DIV_8_BIT)
-#define CSD_COMM_CLK_DIV_NUM        (1U)
-#define CSD_COMM_CLK_DIV_VAL        (3U)
-#define CSD_COMM_SCL_PORT           (GPIO_PRT6)
-#define CSD_COMM_SCL_PIN            (0u)
-#define CSD_COMM_SDA_PORT           (GPIO_PRT6)
-#define CSD_COMM_SDA_PIN            (1u)
-#define CSD_COMM_SCL_HSIOM_SEL      (P6_0_SCB3_I2C_SCL)
-#define CSD_COMM_SDA_HSIOM_SEL      (P6_1_SCB3_I2C_SDA)
-#define SLAVE_ADDRESS_1             (8)
-
 /* CapSense interrupt priority */
 #define CAPSENSE_INTERRUPT_PRIORITY (7u)
 
-/* EZI2C interrupt priority must be higher than CapSense interrupt */
-#define EZI2C_INTERRUPT_PRIORITY    (6u)
-
 /* CapSense scan interval */
-#define CAPSENSE_SCAN_INTERVAL_MS   (50u)
+#define CAPSENSE_SCAN_INTERVAL_MS   (10u)
 
 /* CapSense functions */
 static cy_status capsense_init(void);
@@ -79,20 +63,41 @@ static void process_touch(void);
 static void capsense_isr(void);
 static void capsense_end_of_scan_callback(cy_stc_active_scan_sns_t* active_scan_sns_ptr);
 static void capsense_timer_callback(TimerHandle_t xTimer);
-static void ezi2c_isr(void);
 
 /*******************************************************************************
  * Global Variables
  ******************************************************************************/
-cy_stc_scb_ezi2c_context_t ezi2c_context;
+cyhal_ezi2c_t sEzI2C;
+cyhal_ezi2c_slave_cfg_t sEzI2C_sub_cfg;
+cyhal_ezi2c_cfg_t sEzI2C_cfg;
 
-/*************** CapSense Scan Thread ***************/
-/*
- * Summary: Task that initializes the CapSense block and processes the touch input.
- *
- *  @param[in] arg argument for the thread
- *
- */
+/* SysPm callback params */
+cy_stc_syspm_callback_params_t callback_params =
+{
+    .base       = CYBSP_CSD_HW,
+    .context    = &cy_capsense_context
+};
+
+cy_stc_syspm_callback_t capsense_deep_sleep_cb =
+{
+    Cy_CapSense_DeepSleepCallback,
+    CY_SYSPM_DEEPSLEEP,
+    (CY_SYSPM_SKIP_CHECK_FAIL | CY_SYSPM_SKIP_BEFORE_TRANSITION | CY_SYSPM_SKIP_AFTER_TRANSITION),
+    &callback_params,
+    NULL,
+    NULL
+};
+
+/*******************************************************************************
+* Function Name: task_capsense
+********************************************************************************
+* Summary:
+*  Task that initializes the CapSense block and processes the touch input.
+*
+* Parameters:
+*  void *param : Task parameter defined during task creation (unused)
+*
+*******************************************************************************/
 void task_capsense(void* param)
 {
     cy_status status;
@@ -111,10 +116,9 @@ void task_capsense(void* param)
 
     /* Initialize CapSense block */
     status = capsense_init();
-    if(CY_RET_SUCCESS != status)
-    {
-        CY_ASSERT(0u);
-    }
+    CY_ASSERT (status == CY_RSLT_SUCCESS);
+
+    (void) status; /* To avoid compiler warning */
 
     /* Start the timer */
     xTimerStart(scan_timer_handle, 0u);
@@ -158,11 +162,13 @@ void task_capsense(void* param)
     }
 }
 
-/*************** Process Touch ***************/
-/*
- * Summary: This function processes the touch input and sends command to MQTT task.
- *
- */
+/*******************************************************************************
+* Function Name: process_touch
+********************************************************************************
+* Summary:
+*  This function processes the touch input and sends command to MQTT task.
+*
+*******************************************************************************/
 static void process_touch(void)
 {
     /* Variables used to store touch information */
@@ -207,7 +213,7 @@ static void process_touch(void)
         send_led_command = true;
         button0_status_prev = button0_status;
         button1_status_prev = 0;
-    	configPRINTF(("Touch detected on BTN0\r\n"));
+        configPRINTF(("Touch detected on BTN0\r\n"));
     }
 
     /* Detect new touch on Button1 */
@@ -217,7 +223,7 @@ static void process_touch(void)
         send_led_command = true;
         button1_status_prev = button1_status;
         button0_status_prev = 0;
-    	configPRINTF(("Touch detected on BTN1\r\n"));
+        configPRINTF(("Touch detected on BTN1\r\n"));
     }
 
     /* Detect new touch on slider */
@@ -235,16 +241,20 @@ static void process_touch(void)
     /* Send command to update LED state */
     if(send_led_command)
     {
+        configPRINTF(("\r\n led_command_data_q Quee write done :: process_touch capsense\r\n"));
         xQueueOverwrite(led_command_data_q, &led_cmd_data);
     }
+
 }
 
-/*************** Initialize CapSense ***************/
-/*
- * Summary: This function initializes the CSD HW block, and configures the CapSense
- *  interrupt.
- *
- */
+/*******************************************************************************
+* Function Name: capsense_init
+********************************************************************************
+* Summary:
+*  This function initializes the CSD HW block, and configures the CapSense
+*  interrupt.
+*
+*******************************************************************************/
 static cy_status capsense_init(void)
 {
     cy_status status;
@@ -265,6 +275,9 @@ static cy_status capsense_init(void)
         NVIC_ClearPendingIRQ(capSense_intr_config.intrSrc);
         NVIC_EnableIRQ(capSense_intr_config.intrSrc);
 
+        /* Initialize the CapSense deep sleep callback functions. */
+        Cy_CapSense_Enable(&cy_capsense_context);
+        Cy_SysPm_RegisterCallback(&capsense_deep_sleep_cb);
         /* Register end of scan callback */
         status = Cy_CapSense_RegisterCallback(CY_CAPSENSE_END_OF_SCAN_E,
                 capsense_end_of_scan_callback, &cy_capsense_context);
@@ -279,14 +292,17 @@ static cy_status capsense_init(void)
     return status;
 }
 
-/*************** CapSense End of Scan Callback ***************/
-/*
- * Summary: CapSense end of scan callback function. This function sends a command to
- *  CapSense task to process scan.
- *
- *  @param[in] active_scan_sns_ptr
- *
- */
+/*******************************************************************************
+* Function Name: capsense_end_of_scan_callback
+********************************************************************************
+* Summary:
+*  CapSense end of scan callback function. This function sends a command to
+*  CapSense task to process scan.
+*
+* Parameters:
+*  cy_stc_active_scan_sns_t * active_scan_sns_ptr (unused)
+*
+*******************************************************************************/
 static void capsense_end_of_scan_callback(cy_stc_active_scan_sns_t* active_scan_sns_ptr)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -299,14 +315,17 @@ static void capsense_end_of_scan_callback(cy_stc_active_scan_sns_t* active_scan_
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-/*************** Timer Callback ***************/
-/*
- * Summary: CapSense timer callback. This function sends a command to start CapSense
- * scan.
- *
- *  @param[in] xTimer timer handle
- *
- */
+/*******************************************************************************
+* Function Name: capsense_timer_callback
+********************************************************************************
+* Summary:
+*  CapSense timer callback. This function sends a command to start CapSense
+*  scan.
+*
+* Parameters:
+*  TimerHandle_t xTimer (unused)
+*
+*******************************************************************************/
 static void capsense_timer_callback(TimerHandle_t xTimer)
 {
     capsense_command_t command = CAPSENSE_SCAN;
@@ -319,79 +338,44 @@ static void capsense_timer_callback(TimerHandle_t xTimer)
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-/*************** CapSense ISR ***************/
-/*
- * Summary: Wrapper function for handling interrupts from CSD block.
- *
- */
+/*******************************************************************************
+* Function Name: capsense_isr
+********************************************************************************
+* Summary:
+*  Wrapper function for handling interrupts from CSD block.
+*
+*******************************************************************************/
 static void capsense_isr(void)
 {
     Cy_CapSense_InterruptHandler(CYBSP_CSD_HW, &cy_capsense_context);
 }
 
-/*************** EzI2C ISR ***************/
-/*
- * Summary: Wrapper function for handling interrupts from EZI2C block.
- *
- */
-static void ezi2c_isr(void)
-{
-    Cy_SCB_EZI2C_Interrupt(CSD_COMM_HW, &ezi2c_context);
-}
-
-/*************** Initialize tuner ***************/
-/*
- * Summary: Initializes communication between Tuner GUI and PSoC 6 MCU.
- *
- */
+/*******************************************************************************
+* Function Name: tuner_init
+********************************************************************************
+* Summary:
+*  Initializes communication between Tuner GUI and PSoC 6 MCU.
+*
+*******************************************************************************/
 static void tuner_init(void)
 {
-    /* EZI2C configuration structure */
-    const cy_stc_scb_ezi2c_config_t csd_comm_config =
-    {
-        .numberOfAddresses = CY_SCB_EZI2C_ONE_ADDRESS,
-        .slaveAddress1 = SLAVE_ADDRESS_1,
-        .slaveAddress2 = 0U,
-        .subAddressSize = CY_SCB_EZI2C_SUB_ADDR16_BITS,
-        .enableWakeFromSleep = false,
-    };
+    cy_rslt_t result;
+    /* Configure Capsense Tuner as EzI2C Slave */
+    sEzI2C_sub_cfg.buf = (uint8 *)&cy_capsense_tuner;
+    sEzI2C_sub_cfg.buf_rw_boundary = sizeof(cy_capsense_tuner);
+    sEzI2C_sub_cfg.buf_size = sizeof(cy_capsense_tuner);
+    sEzI2C_sub_cfg.slave_address = 8U;
 
-    /* EZI2C interrupt configuration structure */
-    static const cy_stc_sysint_t ezi2c_intr_config =
-    {
-        .intrSrc = CSD_COMM_IRQ,
-        .intrPriority = EZI2C_INTERRUPT_PRIORITY,
-    };
+    sEzI2C_cfg.data_rate = CYHAL_EZI2C_DATA_RATE_400KHZ;
+    sEzI2C_cfg.enable_wake_from_sleep = true;
+    sEzI2C_cfg.slave1_cfg = sEzI2C_sub_cfg;
+    sEzI2C_cfg.sub_address_size = CYHAL_EZI2C_SUB_ADDR16_BITS;
+    sEzI2C_cfg.two_addresses = false;
+    result = cyhal_ezi2c_init( &sEzI2C, CYBSP_I2C_SDA, CYBSP_I2C_SCL, NULL, &sEzI2C_cfg);
+    CY_ASSERT (result == CY_RSLT_SUCCESS);
 
-    /* Initialize EZI2C pins */
-    Cy_GPIO_Pin_FastInit(CSD_COMM_SCL_PORT, CSD_COMM_SCL_PIN,
-                         CY_GPIO_DM_OD_DRIVESLOW, 1, CSD_COMM_SCL_HSIOM_SEL);
-    Cy_GPIO_Pin_FastInit(CSD_COMM_SDA_PORT, CSD_COMM_SDA_PIN,
-                         CY_GPIO_DM_OD_DRIVESLOW, 1, CSD_COMM_SDA_HSIOM_SEL);
+    (void) result; /* To avoid compiler warning */
 
-    /* Configure EZI2C clock */
-    Cy_SysClk_PeriphDisableDivider(CSD_COMM_CLK_DIV_HW, CSD_COMM_CLK_DIV_NUM);
-    Cy_SysClk_PeriphAssignDivider(CSD_COMM_PCLK, CSD_COMM_CLK_DIV_HW,
-                                  CSD_COMM_CLK_DIV_NUM);
-    Cy_SysClk_PeriphSetDivider(CSD_COMM_CLK_DIV_HW, CSD_COMM_CLK_DIV_NUM,
-                                   CSD_COMM_CLK_DIV_VAL);
-    Cy_SysClk_PeriphEnableDivider(CSD_COMM_CLK_DIV_HW, CSD_COMM_CLK_DIV_NUM);
-
-
-    /* Initialize EZI2C */
-    Cy_SCB_EZI2C_Init(CSD_COMM_HW, &csd_comm_config, &ezi2c_context);
-
-    /* Initialize and enable EZI2C interrupts */
-    Cy_SysInt_Init(&ezi2c_intr_config, ezi2c_isr);
-    NVIC_EnableIRQ(ezi2c_intr_config.intrSrc);
-
-    /* Set up communication data buffer to CapSense data structure to be exposed
-     * to I2C master at primary slave address request.
-     */
-    Cy_SCB_EZI2C_SetBuffer1(CSD_COMM_HW, (uint8 *)&cy_capsense_tuner,
-                            sizeof(cy_capsense_tuner), sizeof(cy_capsense_tuner),
-                            &ezi2c_context);
-
-    /* Enable EZI2C block */
-    Cy_SCB_EZI2C_Enable(CSD_COMM_HW);
 }
+
+/* [] END OF FILE */

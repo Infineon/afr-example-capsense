@@ -4,23 +4,24 @@
 * Description: This file contains threads, functions, and other resources related
 * to MQTT operations.
 *
-******************************************************************************
-* Copyright (2019), Cypress Semiconductor Corporation.
-******************************************************************************
-* This software, including source code, documentation and related materials
-* (“Software”), is owned by Cypress Semiconductor Corporation or one of its
-* subsidiaries (“Cypress”) and is protected by and subject to worldwide patent
-* protection (United States and foreign), United States copyright laws and
-* international treaty provisions. Therefore, you may use this Software only
-* as provided in the license agreement accompanying the software package from
-* which you obtained this Software (“EULA”).
+*******************************************************************************
+* Copyright 2019-2021, Cypress Semiconductor Corporation (an Infineon company) or
+* an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 *
-* If no EULA applies, Cypress hereby grants you a personal, nonexclusive,
-* non-transferable license to copy, modify, and compile the Software source
-* code solely for use in connection with Cypress’s integrated circuit products.
-* Any reproduction, modification, translation, compilation, or representation
-* of this Software except as specified above is prohibited without the express
-* written permission of Cypress.
+* This software, including source code, documentation and related
+* materials ("Software") is owned by Cypress Semiconductor Corporation
+* or one of its affiliates ("Cypress") and is protected by and subject to
+* worldwide patent protection (United States and foreign),
+* United States copyright laws and international treaty provisions.
+* Therefore, you may use this Software only as provided in the license
+* agreement accompanying the software package from which you
+* obtained this Software ("EULA").
+* If no EULA applies, Cypress hereby grants you a personal, non-exclusive,
+* non-transferable license to copy, modify, and compile the Software
+* source code solely for use in connection with Cypress's
+* integrated circuit products.  Any reproduction, modification, translation,
+* compilation, or representation of this Software except as specified
+* above is prohibited without the express written permission of Cypress.
 *
 * Disclaimer: THIS SOFTWARE IS PROVIDED AS-IS, WITH NO WARRANTY OF ANY KIND,
 * EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, NONINFRINGEMENT, IMPLIED
@@ -30,11 +31,12 @@
 * Software or any product or circuit described in the Software. Cypress does
 * not authorize its products for use in any products where a malfunction or
 * failure of the Cypress product may reasonably be expected to result in
-* significant property damage, injury or death (“High Risk Product”). By
-* including Cypress’s product in a High Risk Product, the manufacturer of such
-* system or application assumes all risk of such use and in doing so agrees to
-* indemnify Cypress against all liability.
-*****************************************​**************************************/
+* significant property damage, injury or death ("High Risk Product"). By
+* including Cypress's product in a High Risk Product, the manufacturer
+* of such system or application assumes all risk of such use and in doing
+* so agrees to indemnify Cypress against all liability.
+*******************************************************************************/
+
 #include "cyhal.h"
 #include "cybsp.h"
 #include "FreeRTOS.h"
@@ -42,7 +44,7 @@
 #include "queue.h"
 #include "semphr.h"
 #include "aws_demo.h"
-#include "cJSON.h"
+#include "cJSON/cJSON.h"
 #include "mqtt_operation.h"
 
 /* Set up logging for this demo. */
@@ -70,23 +72,27 @@
  * Global variable
  ******************************************************************************/
 QueueHandle_t led_command_data_q;
+
 cyhal_pwm_t pwm_led;
 bool led_on = false;
 
 /*******************************************************************************
  * Forward Declaration
  ******************************************************************************/
-void updateLedBrightness(uint32_t brightness);
-void updateLedState(const char* command);
+void update_led_brightness(uint32_t brightness);
+void update_led_state(const char* command);
 
-/*************** MQTT Publish Thread ***************/
-/*
- * Summary: This task receives command from CapSense Task and publishes the state of
- * buttons/slider to an AWS thing shadow
- *
- *  @param[in] arg argument for the thread
- *
- */
+/*******************************************************************************
+* Function Name: task_capsense
+********************************************************************************
+* Summary:
+*  This task receives command from CapSense Task and publishes the state of
+*  buttons/slider to an AWS thing shadow
+*
+* Parameters:
+*  void *param : Task parameter defined during task creation (unused)
+*
+*******************************************************************************/
 void task_mqtt(void* param)
 {
     /* Suppress warning for unused parameter */
@@ -95,11 +101,17 @@ void task_mqtt(void* param)
     mqtt_data_t mqtt_cmd_data;  /* Queue to receive command from CapSense task */
     char json[MAX_JSON_MESSAGE_LENGTH]; /* JSON message to send */
     char topic[MAX_TOPIC_LENGTH];       /* Buffer for topic name */
-    uint16_t topicLength = 0;   /* Length of topic */
-    uint16_t messageLength = 0; /* Length of JSON message */
+    uint16_t topic_length = 0;   /* Length of topic */
+    uint16_t message_length = 0; /* Length of JSON message */
 
     /* Configure the TCPWM for driving led */
     cyhal_pwm_init(&pwm_led, CYBSP_USER_LED, NULL);
+
+    /* Create the queue. See the data-type for details of queue
+     * contents
+     */
+    led_command_data_q  = xQueueCreate(SINGLE_ELEMENT_QUEUE,
+                                       sizeof(mqtt_data_t));
 
     /* Send command to get status of LED from the device shadow */
     mqtt_cmd_data.command = GET_LED_STATE;
@@ -110,33 +122,33 @@ void task_mqtt(void* param)
         /* Block until a command has been received over queue */
         xQueueReceive(led_command_data_q, &mqtt_cmd_data, portMAX_DELAY);
 
-        topicLength = snprintf(topic, sizeof(topic), TOPIC_SHADOW_UPDATE);
+        topic_length = snprintf(topic, sizeof(topic), TOPIC_SHADOW_UPDATE);
 
         switch(mqtt_cmd_data.command)
         {
             /* Turn on the LED. */
             case LED_TURN_ON:
             {
-                messageLength = snprintf(json, sizeof(json), "{\"state\" : {\"reported\" : {\"Command\": \"LED ON\"}}}");
+                message_length = snprintf(json, sizeof(json), "{\"state\" : {\"reported\" : {\"Command\": \"LED ON\"}}}");
                 break;
             }
             /* Turn off LED */
             case LED_TURN_OFF:
             {
-                messageLength = snprintf(json, sizeof(json), "{\"state\" : {\"reported\" : {\"Command\": \"LED OFF\"}}}");
+                message_length = snprintf(json, sizeof(json), "{\"state\" : {\"reported\" : {\"Command\": \"LED OFF\"}}}");
                 break;
             }
             /* Update LED brightness */
             case LED_UPDATE_BRIGHTNESS:
             {
-                messageLength = snprintf(json, sizeof(json), "{\"state\" : {\"reported\" : {\"Brightness\": %d}}}", (int)mqtt_cmd_data.brightness);
+                message_length = snprintf(json, sizeof(json), "{\"state\" : {\"reported\" : {\"Brightness\": %d}}}", (int)mqtt_cmd_data.brightness);
                 break;
             }
             /* Send empty message and set topic to get shadow status */
             case GET_LED_STATE:
             {
-                messageLength = snprintf(json, sizeof(json), "{}");
-                topicLength = snprintf(topic, sizeof(topic), TOPIC_SHADOW_GET);
+                message_length = snprintf(json, sizeof(json), "{}");
+                topic_length = snprintf(topic, sizeof(topic), TOPIC_SHADOW_GET);
                 break;
             }
             /* Invalid command */
@@ -148,26 +160,32 @@ void task_mqtt(void* param)
         }
 
         /* PUBLISH (and wait) for all messages. */
-        PublishMessage( mqtt_connection,
-                        topic,
-                        topicLength,
-                        json,
-                        messageLength);
+        publish_message( mqtt_connection,
+                         topic,
+                         topic_length,
+                         json,
+                         message_length);
 
         vTaskDelay(pdMS_TO_TICKS(MQTT_THREAD_LOOP_DELAY_MS));
     }
 }
 
-/*************** Initialize MQTT library***************/
-/* @return `EXIT_SUCCESS` if all libraries were successfully initialized; EXIT_FAILURE` otherwise. */
-int InitializeMqtt( void )
+
+/*******************************************************************************
+* Function Name: initialize_mqtt
+********************************************************************************
+* Summary:
+*  This function initialize MQTT library.
+*
+*******************************************************************************/
+int initialize_mqtt( void )
 {
     int status = EXIT_SUCCESS;
-    IotMqttError_t mqttInitStatus = IOT_MQTT_SUCCESS;
+    IotMqttError_t mqtt_init_status = IOT_MQTT_SUCCESS;
 
-    mqttInitStatus = IotMqtt_Init();
+    mqtt_init_status = IotMqtt_Init();
 
-    if( mqttInitStatus != IOT_MQTT_SUCCESS )
+    if( mqtt_init_status != IOT_MQTT_SUCCESS )
     {
         /* Failed to initialize MQTT library. */
         configPRINTF(("Failed to initialize MQTT library\r\n"));
@@ -176,67 +194,74 @@ int InitializeMqtt( void )
     return status;
 }
 
-/*************** Establish a new connection to the MQTT server ***************/
-/*
- * Summary: Establish a new connection to the MQTT server.
- *
- * @param[in] awsIotMqttMode Specify if this demo is running with the AWS IoT
- * MQTT server. Set this to `false` if using another MQTT server.
- * @param[in] pIdentifier NULL-terminated MQTT client identifier.
- * @param[in] pNetworkServerInfo Passed to the MQTT connect function when
- * establishing the MQTT connection.
- * @param[in] pNetworkCredentialInfo Passed to the MQTT connect function when
- * establishing the MQTT connection.
- * @param[in] pNetworkInterface The network interface to use for this demo.
- * @param[out] pmqtt_connection Set to the handle to the new MQTT connection.
- *
- * @return `EXIT_SUCCESS` if the connection is successfully established; `EXIT_FAILURE`
- * otherwise.
- */
-int EstablishMqttConnection( bool awsIotMqttMode,
-                             const char * pIdentifier,
-                             void * pNetworkServerInfo,
-                             void * pNetworkCredentialInfo,
-                             const IotNetworkInterface_t * pNetworkInterface,
-                             IotMqttConnection_t * pmqtt_connection )
+/*******************************************************************************
+* Function Name: establish_mqtt_connection
+********************************************************************************
+* Summary:
+*  Establish a new connection to the MQTT server.
+*
+* Parameters:
+*  bool aws_iot_mqtt_mode          : Specify if this demo is running with the AWS
+*                                    IoT MQTT server. Set this to `false` if using 
+*                                    another MQTT server.
+*  const char *p_identifier        : p_identifier NULL-terminated MQTT client identifier.
+*  void *p_network_server_info     : Passed to the MQTT connect function when
+*                                    establishing the MQTT connection.
+*  void *p_network_credential_info : Passed to the MQTT connect function when
+*                                    establishing the MQTT connection.
+*  const IotNetworkInterface_t * p_network_interface : The network interface to use 
+*                                                      for this demo
+*  IotMqttConnection_t * p_mqtt_connection : Set to the handle to the new MQTT connection.
+*
+* Return:
+*  int status : `EXIT_SUCCESS` if the connection is successfully established; `EXIT_FAILURE`
+*  otherwise.
+*
+*******************************************************************************/
+int establish_mqtt_connection( bool aws_iot_mqtt_mode,
+                               const char * p_identifier,
+                               void * p_network_server_info,
+                               void * p_network_credential_info,
+                               const IotNetworkInterface_t * p_network_interface,
+                               IotMqttConnection_t * p_mqtt_connection )
 {
     int status = EXIT_SUCCESS;
-    IotMqttError_t connectStatus = IOT_MQTT_STATUS_PENDING;
-    IotMqttNetworkInfo_t networkInfo = IOT_MQTT_NETWORK_INFO_INITIALIZER;
-    IotMqttConnectInfo_t connectInfo = IOT_MQTT_CONNECT_INFO_INITIALIZER;
+    IotMqttError_t connect_status = IOT_MQTT_STATUS_PENDING;
+    IotMqttNetworkInfo_t network_info = IOT_MQTT_NETWORK_INFO_INITIALIZER;
+    IotMqttConnectInfo_t connect_info = IOT_MQTT_CONNECT_INFO_INITIALIZER;
 
     /*
      * Set the members of the network info not set by the initializer. This
      * struct provided information on the transport layer to the MQTT connection.
      */
-    networkInfo.createNetworkConnection = true;
-    networkInfo.u.setup.pNetworkServerInfo = pNetworkServerInfo;
-    networkInfo.u.setup.pNetworkCredentialInfo = pNetworkCredentialInfo;
-    networkInfo.pNetworkInterface = pNetworkInterface;
+    network_info.createNetworkConnection = true;
+    network_info.u.setup.pNetworkServerInfo = p_network_server_info;
+    network_info.u.setup.pNetworkCredentialInfo = p_network_credential_info;
+    network_info.pNetworkInterface = p_network_interface;
 
     #if ( IOT_MQTT_ENABLE_SERIALIZER_OVERRIDES == 1 ) && defined( IOT_DEMO_MQTT_SERIALIZER )
-        networkInfo.pMqttSerializer = IOT_DEMO_MQTT_SERIALIZER;
+        network_info.pMqttSerializer = IOT_DEMO_MQTT_SERIALIZER;
     #endif
 
     /* Set the members of the connection info not set by the initializer. */
-    connectInfo.awsIotMqttMode = awsIotMqttMode;
-    connectInfo.cleanSession = true;
-    connectInfo.keepAliveSeconds = KEEP_ALIVE_SECONDS;
-    connectInfo.pWillInfo = NULL;
+    connect_info.awsIotMqttMode = aws_iot_mqtt_mode;
+    connect_info.cleanSession = true;
+    connect_info.keepAliveSeconds = KEEP_ALIVE_SECONDS;
+    connect_info.pWillInfo = NULL;
 
     /* Use the parameter client identifier provided. */
-    if( pIdentifier != NULL )
+    if( p_identifier != NULL )
     {
-        connectInfo.pClientIdentifier = pIdentifier;
-        connectInfo.clientIdentifierLength = ( uint16_t ) strlen( pIdentifier );
+        connect_info.pClientIdentifier = p_identifier;
+        connect_info.clientIdentifierLength = ( uint16_t ) strlen( p_identifier );
     }
 
-    connectStatus = IotMqtt_Connect( &networkInfo,
-                                     &connectInfo,
-                                     MQTT_TIMEOUT_MS,
-                                     pmqtt_connection );
+    connect_status = IotMqtt_Connect( &network_info,
+                                      &connect_info,
+                                      MQTT_TIMEOUT_MS,
+                                      p_mqtt_connection );
 
-    if( connectStatus != IOT_MQTT_SUCCESS )
+    if( connect_status != IOT_MQTT_SUCCESS )
     {
         status = EXIT_FAILURE;
     }
@@ -244,54 +269,59 @@ int EstablishMqttConnection( bool awsIotMqttMode,
     return status;
 }
 
-/*************** Modify MQTT Subscription ***************/
-/*
- * Summary: Add or remove subscriptions by either subscribing or unsubscribing.
- *
- * @param[in] mqtt_connection The MQTT connection to use for subscriptions.
- * @param[in] operation Either #IOT_MQTT_SUBSCRIBE or #IOT_MQTT_UNSUBSCRIBE.
- * @param[in] pTopicFilters Array of topic filters for subscriptions.
- * @param[in] pTopicFilterLength Array of length of topic filters.
- * @param[in] filterCount Number of topic filters.
- * @param[in] pCallbackParameter The parameter to pass to the subscription
- * callback.
- *
- * @return `EXIT_SUCCESS` if the subscription operation succeeded; `EXIT_FAILURE`
- * otherwise.
- */
-int ModifySubscriptions( IotMqttConnection_t mqtt_connection,
-                         IotMqttOperationType_t operation,
-                         const char ** pTopicFilters,
-                         const uint16_t *pTopicFilterLength,
-                         const uint32_t filterCount,
-                         void * pCallbackParameter )
+/*******************************************************************************
+* Function Name: modify_subscriptions
+********************************************************************************
+* Summary:
+*  Establish a new connection to the MQTT server.
+*
+* Parameters:
+*  IotMqttConnection_t mqtt_connection   : The MQTT connection to use for subscriptions.
+*  IotMqttOperationType_t operation      : Either #IOT_MQTT_SUBSCRIBE or #IOT_MQTT_UNSUBSCRIBE.
+*  const char ** p_topic_filters         : Array of topic filters for subscriptions.
+*  const uint16_t *p_topic_filter_length : Array of length of topic filters.
+*  const uint32_t filter_count           : Number of topic filters. 
+*  void * p_callback_parameter           : The parameter to pass to the subscription
+*                                          callback.
+*
+* Return:
+*  int status : `EXIT_SUCCESS` if the connection is successfully established; `EXIT_FAILURE`
+*  otherwise.
+*
+*******************************************************************************/
+int modify_subscriptions( IotMqttConnection_t mqtt_connection,
+                          IotMqttOperationType_t operation,
+                          const char ** p_topic_filters,
+                          const uint16_t *p_topic_filter_length,
+                          const uint32_t filter_count,
+                          void * p_callback_parameter )
 {
     int status = EXIT_SUCCESS;
     uint32_t i = 0;
-    IotMqttError_t subscriptionStatus = IOT_MQTT_STATUS_PENDING;
-    IotMqttSubscription_t pSubscriptions[ filterCount ];
+    IotMqttError_t subscription_status = IOT_MQTT_STATUS_PENDING;
+    IotMqttSubscription_t p_subscriptions[ filter_count ];
 
     /* Set the members of the subscription list. */
-    for( i = 0; i < filterCount; i++ )
+    for( i = 0; i < filter_count; i++ )
     {
-        pSubscriptions[ i ].qos = IOT_MQTT_QOS_1;
-        pSubscriptions[ i ].pTopicFilter = pTopicFilters[ i ];
-        pSubscriptions[ i ].topicFilterLength = pTopicFilterLength[ i ];
-        pSubscriptions[ i ].callback.pCallbackContext = pCallbackParameter;
-        pSubscriptions[ i ].callback.function = MqttSubscriptionCallback;
+        p_subscriptions[ i ].qos = IOT_MQTT_QOS_1;
+        p_subscriptions[ i ].pTopicFilter = p_topic_filters[ i ];
+        p_subscriptions[ i ].topicFilterLength = p_topic_filter_length[ i ];
+        p_subscriptions[ i ].callback.pCallbackContext = p_callback_parameter;
+        p_subscriptions[ i ].callback.function = mqtt_subscription_callback;
     }
 
     /* Modify subscriptions by either subscribing or unsubscribing. */
     if( operation == IOT_MQTT_SUBSCRIBE )
     {
-        subscriptionStatus = IotMqtt_TimedSubscribe( mqtt_connection,
-                                                     pSubscriptions,
-                                                     filterCount,
-                                                     0,
-                                                     MQTT_TIMEOUT_MS );
+        subscription_status = IotMqtt_TimedSubscribe( mqtt_connection,
+                                                      p_subscriptions,
+                                                      filter_count,
+                                                      0,
+                                                      MQTT_TIMEOUT_MS );
 
         /* Check the status of SUBSCRIBE. */
-        switch( subscriptionStatus )
+        switch( subscription_status )
         {
             case IOT_MQTT_SUCCESS:
                 IotLogInfo( "All demo topic filter subscriptions accepted.\r\n");
@@ -300,22 +330,22 @@ int ModifySubscriptions( IotMqttConnection_t mqtt_connection,
             case IOT_MQTT_SERVER_REFUSED:
 
                 /* Check which subscriptions were rejected before exiting the demo. */
-                for( i = 0; i < filterCount; i++ )
+                for( i = 0; i < filter_count; i++ )
                 {
                     if( IotMqtt_IsSubscribed( mqtt_connection,
-                                              pSubscriptions[ i ].pTopicFilter,
-                                              pSubscriptions[ i ].topicFilterLength,
+                                              p_subscriptions[ i ].pTopicFilter,
+                                              p_subscriptions[ i ].topicFilterLength,
                                               NULL ) == true )
                     {
                         IotLogInfo("Topic filter %.*s was accepted.\r\n",
-                                    pSubscriptions[ i ].topicFilterLength,
-                                    pSubscriptions[ i ].pTopicFilter);
+                                    p_subscriptions[ i ].topicFilterLength,
+                                    p_subscriptions[ i ].pTopicFilter);
                     }
                     else
                     {
                         IotLogInfo("Topic filter %.*s was rejected.\r\n",
-                                    pSubscriptions[ i ].topicFilterLength,
-                                    pSubscriptions[ i ].pTopicFilter);
+                                    p_subscriptions[ i ].topicFilterLength,
+                                    p_subscriptions[ i ].pTopicFilter);
                     }
                 }
 
@@ -330,14 +360,14 @@ int ModifySubscriptions( IotMqttConnection_t mqtt_connection,
     }
     else if( operation == IOT_MQTT_UNSUBSCRIBE )
     {
-        subscriptionStatus = IotMqtt_TimedUnsubscribe( mqtt_connection,
-                                                       pSubscriptions,
-                                                       filterCount,
-                                                       0,
-                                                       MQTT_TIMEOUT_MS );
+        subscription_status = IotMqtt_TimedUnsubscribe( mqtt_connection,
+                                                        p_subscriptions,
+                                                        filter_count,
+                                                        0,
+                                                        MQTT_TIMEOUT_MS );
 
         /* Check the status of UNSUBSCRIBE. */
-        if( subscriptionStatus != IOT_MQTT_SUCCESS )
+        if( subscription_status != IOT_MQTT_SUCCESS )
         {
             status = EXIT_FAILURE;
         }
@@ -350,97 +380,106 @@ int ModifySubscriptions( IotMqttConnection_t mqtt_connection,
 
         status = EXIT_FAILURE;
     }
-
     return status;
 }
 
-/*************** Publish MQTT Message ***************/
-/*
- * Summary: Publish MQTT Message
- *
- * @param[in] mqtt_connection The MQTT connection to use for publishing.
- * @param[in] Topic name for publishing.
- * @param[in] Topic name length.
- * @param[in] Message for publishing.
- * @param[in] Message length.
- *
- * @return `EXIT_SUCCESS` if all messages are published and received; `EXIT_FAILURE`
- * otherwise.
- */
-int PublishMessage( IotMqttConnection_t mqtt_connection,
-                    char* topic,
-                    uint16_t topicLength,
-                    char* mqttMessage,
-                    uint16_t messageLength)
+/*******************************************************************************
+* Function Name: publish_message
+********************************************************************************
+* Summary:
+*  Publish MQTT Message.
+*
+* Parameters:
+*  IotMqttConnection_t mqtt_connection : The MQTT connection to use for publishing.
+*  char* topic                         : Topic name for publishing.
+*  uint16_t topic_length               : Topic name length.
+*  char* mqtt_message                  : Message for publishing.
+*  uint16_t message_length             : Message length. 
+*
+* Return:
+*  int status : `EXIT_SUCCESS` if all messages are published and received; 
+*               `EXIT_FAILURE` otherwise.
+*
+*******************************************************************************/
+int publish_message( IotMqttConnection_t mqtt_connection,
+                     char* topic,
+                     uint16_t topic_length,
+                     char* mqtt_message,
+                     uint16_t message_length)
 {
     int status = EXIT_SUCCESS;
-    IotMqttError_t publishStatus = IOT_MQTT_STATUS_PENDING;
-    IotMqttPublishInfo_t publishInfo = IOT_MQTT_PUBLISH_INFO_INITIALIZER;
-    IotMqttCallbackInfo_t publishComplete = IOT_MQTT_CALLBACK_INFO_INITIALIZER;
+    IotMqttError_t publish_status = IOT_MQTT_STATUS_PENDING;
+    IotMqttPublishInfo_t publish_info = IOT_MQTT_PUBLISH_INFO_INITIALIZER;
+    IotMqttCallbackInfo_t publish_complete = IOT_MQTT_CALLBACK_INFO_INITIALIZER;
 
     /* The MQTT library should invoke this callback when a PUBLISH message
      * is successfully transmitted. Assign NULL to not attach a callback */
-    publishComplete.function = NULL;
+    publish_complete.function = NULL;
 
     /* Pass the PUBLISH number to the operation complete callback.
        Assigned NULL since callback is not attached */
-    publishComplete.pCallbackContext = NULL;
+    publish_complete.pCallbackContext = NULL;
 
     /* Set the common members of the publish info. */
-    publishInfo.qos = IOT_MQTT_QOS_1;
-    publishInfo.topicNameLength = topicLength;
-    publishInfo.pPayload = mqttMessage;
-    publishInfo.retryMs = PUBLISH_RETRY_MS;
-    publishInfo.retryLimit = PUBLISH_RETRY_LIMIT;
-    publishInfo.payloadLength = ( size_t ) messageLength;
-    publishInfo.pTopicName = topic;
+    publish_info.qos = IOT_MQTT_QOS_1;
+    publish_info.topicNameLength = topic_length;
+    publish_info.pPayload = mqtt_message;
+    publish_info.retryMs = PUBLISH_RETRY_MS;
+    publish_info.retryLimit = PUBLISH_RETRY_LIMIT;
+    publish_info.payloadLength = ( size_t ) message_length;
+    publish_info.pTopicName = topic;
 
     /* PUBLISH a message */
-    publishStatus = IotMqtt_Publish( mqtt_connection,
-                                     &publishInfo,
-                                     0,
-                                     &publishComplete,
-                                     NULL );
+    publish_status = IotMqtt_Publish( mqtt_connection,
+                                      &publish_info,
+                                      0,
+                                      &publish_complete,
+                                      NULL );
 
-    if( publishStatus != IOT_MQTT_STATUS_PENDING )
+    if( publish_status != IOT_MQTT_STATUS_PENDING )
     {
         status = EXIT_FAILURE;
     }
     return status;
 }
 
-/***************  MQTT Subscription callback ***************/
-/*
- * Summary: Called by the MQTT library when an incoming PUBLISH message is received.
- *
- * The demo uses this callback to handle incoming PUBLISH messages.
- * @param[in] param1 Counts the total number of received PUBLISH messages. This
- * callback will increment this counter.
- * @param[in] pPublish Information about the incoming PUBLISH message passed by
- * the MQTT library.
- */
-void MqttSubscriptionCallback( void * param1,
-                               IotMqttCallbackParam_t * const pPublish )
+/*******************************************************************************
+* Function Name: mqtt_subscription_callback
+********************************************************************************
+* Summary:
+*  Called by the MQTT library when an incoming PUBLISH message is received.
+*  The demo uses this callback to handle incoming PUBLISH messages.
+*
+* Parameters:
+*  void * param1 : Counts the total number of received PUBLISH messages. This
+*                  callback will increment this counter.
+*  IotMqttCallbackParam_t * const p_publish : TInformation about the incoming
+*                                             PUBLISH message passed by the
+*                                             MQTT library.
+*
+*******************************************************************************/
+void mqtt_subscription_callback( void * param1,
+                                 IotMqttCallbackParam_t * const p_publish )
 {
     ( void )param1;             /* Suppress compiler warning */
-    char topicStr[MAX_TOPIC_LENGTH] = {0};    /* String to copy the topic into */
-    char pubType[20] =  {0};    /* String to compare to the publish type */
+    char topic_str[MAX_TOPIC_LENGTH] = {0};    /* String to copy the topic into */
+    char pub_type[20] =  {0};    /* String to compare to the publish type */
 
     /* Copy the message to a null terminated string */
-    memcpy(topicStr, pPublish->u.message.info.pTopicName, pPublish->u.message.info.topicNameLength);
-    topicStr[pPublish->u.message.info.topicNameLength+1] = 0; /* Add termination */
+    memcpy(topic_str, p_publish->u.message.info.pTopicName, p_publish->u.message.info.topicNameLength);
+    topic_str[p_publish->u.message.info.topicNameLength+1] = 0; /* Add termination */
 
     /* Copy the message to a null terminated string */
-    char *pPayload = (char*)pvPortMalloc(pPublish->u.message.info.payloadLength + 1);
-    memcpy(pPayload, pPublish->u.message.info.pPayload, pPublish->u.message.info.payloadLength);
-    topicStr[pPublish->u.message.info.topicNameLength] = 0; /* Add termination */
+    char *pPayload = (char*)pvPortMalloc(p_publish->u.message.info.payloadLength + 1);
+    memcpy(pPayload, p_publish->u.message.info.pPayload, p_publish->u.message.info.payloadLength);
+    topic_str[p_publish->u.message.info.topicNameLength] = 0; /* Add termination */
 
 
     /* Scan the topic to extract publish type */
-    sscanf(topicStr, "$aws/things/capsense/shadow/%19s", pubType);
+    sscanf(topic_str, "$aws/things/capsense/shadow/%19s", pub_type);
 
     /* Check to see if it is an initial get of the values of other things */
-    if(strcmp(pubType,"get/accepted") == 0)
+    if(strcmp(pub_type,"get/accepted") == 0)
     {
         /* Parse JSON message */
         cJSON *root = cJSON_Parse(pPayload);
@@ -450,8 +489,8 @@ void MqttSubscriptionCallback( void * param1,
         if(reported == NULL)
         {
             /* If there is no previous shadow state, set LED to max brightness and start PWM */
-            updateLedState("LED ON");
-            updateLedBrightness(MAX_DUTY_CYCLE);
+            update_led_state("LED ON");
+            update_led_brightness(MAX_DUTY_CYCLE);
         }
         else
         {
@@ -460,17 +499,17 @@ void MqttSubscriptionCallback( void * param1,
 
             if(command != NULL)
             {
-                updateLedState(command->valuestring);
+                update_led_state(command->valuestring);
             }
             if(brightness != NULL)
             {
-                updateLedBrightness(brightness->valueint);
+                update_led_brightness(brightness->valueint);
             }
         }
         cJSON_Delete(root);
     }
 
-    if(strcmp(pubType,"update/documents") == 0)
+    if(strcmp(pub_type,"update/documents") == 0)
     {
         /* Parse JSON message */
         cJSON *root = cJSON_Parse(pPayload);
@@ -482,19 +521,28 @@ void MqttSubscriptionCallback( void * param1,
 
         if(command != NULL)
         {
-            updateLedState(command->valuestring);
+            update_led_state(command->valuestring);
         }
         if(brightness != NULL)
         {
-            updateLedBrightness(brightness->valueint);
+            update_led_brightness(brightness->valueint);
         }
         cJSON_Delete(root);
     }
     vPortFree(pPayload);
 }
 
-/***************  Turn ON/OFF LED  ***************/
-void updateLedState(const char* command)
+/*******************************************************************************
+* Function Name: update_led_state
+********************************************************************************
+* Summary:
+*  This function turn ON/OFF LED.
+*
+* Parameters:
+*  const char* command : command to either turn on (LED ON) or turn off (LED OFF) 
+*                        the user LED 
+*******************************************************************************/
+void update_led_state(const char* command)
 {
     if(0 == strcmp(command, "LED ON"))
     {
@@ -514,10 +562,21 @@ void updateLedState(const char* command)
             led_on = false;
         }
     }
+
 }
 
-/***************  Change LED Brightness  ***************/
-void updateLedBrightness(uint32_t brightness)
+/*******************************************************************************
+* Function Name: update_led_state
+********************************************************************************
+* Summary:
+*  Change LED Brightness.
+*
+* Parameters:
+*  uint32_t brightness : Drive the LED with brightness value. 
+*******************************************************************************/
+void update_led_brightness(uint32_t brightness)
 {
     cyhal_pwm_set_duty_cycle(&pwm_led, GET_DUTY_CYCLE(brightness), PWM_LED_FREQ_HZ);
 }
+
+/* [] END OF FILE */

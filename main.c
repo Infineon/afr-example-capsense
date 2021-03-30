@@ -1,28 +1,30 @@
 /******************************************************************************
 * File Name: main.c
 *
-* Description: This is the source code for CE229142 - Amazon FreeRTOS Example:
-*              CapSense
+* Description: This is the source code for CE229142 - AWS IoT and FreeRTOS for 
+*              PSoC 6 MCU: CapSense
 *
 * Related Document: See README.md
 *
-*******************************************************************************
-* (c) 2019, Cypress Semiconductor Corporation. All rights reserved.
-*******************************************************************************
-* This software, including source code, documentation and related materials
-* ("Software"), is owned by Cypress Semiconductor Corporation or one of its
-* subsidiaries ("Cypress") and is protected by and subject to worldwide patent
-* protection (United States and foreign), United States copyright laws and
-* international treaty provisions. Therefore, you may use this Software only
-* as provided in the license agreement accompanying the software package from
-* which you obtained this Software ("EULA").
 *
+*******************************************************************************
+* Copyright 2019-2021, Cypress Semiconductor Corporation (an Infineon company) or
+* an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
+*
+* This software, including source code, documentation and related
+* materials ("Software") is owned by Cypress Semiconductor Corporation
+* or one of its affiliates ("Cypress") and is protected by and subject to
+* worldwide patent protection (United States and foreign),
+* United States copyright laws and international treaty provisions.
+* Therefore, you may use this Software only as provided in the license
+* agreement accompanying the software package from which you
+* obtained this Software ("EULA").
 * If no EULA applies, Cypress hereby grants you a personal, non-exclusive,
-* non-transferable license to copy, modify, and compile the Software source
-* code solely for use in connection with Cypress's integrated circuit products.
-* Any reproduction, modification, translation, compilation, or representation
-* of this Software except as specified above is prohibited without the express
-* written permission of Cypress.
+* non-transferable license to copy, modify, and compile the Software
+* source code solely for use in connection with Cypress's
+* integrated circuit products.  Any reproduction, modification, translation,
+* compilation, or representation of this Software except as specified
+* above is prohibited without the express written permission of Cypress.
 *
 * Disclaimer: THIS SOFTWARE IS PROVIDED AS-IS, WITH NO WARRANTY OF ANY KIND,
 * EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, NONINFRINGEMENT, IMPLIED
@@ -33,9 +35,9 @@
 * not authorize its products for use in any products where a malfunction or
 * failure of the Cypress product may reasonably be expected to result in
 * significant property damage, injury or death ("High Risk Product"). By
-* including Cypress's product in a High Risk Product, the manufacturer of such
-* system or application assumes all risk of such use and in doing so agrees to
-* indemnify Cypress against all liability.
+* including Cypress's product in a High Risk Product, the manufacturer
+* of such system or application assumes all risk of such use and in doing
+* so agrees to indemnify Cypress against all liability.
 *******************************************************************************/
 
 /* FreeRTOS includes. */
@@ -88,7 +90,7 @@ static void prvMiscInitialization( void );
 /**
  * @brief Initialize the user application.
  */
-void InitApplication(void);
+void init_application(void);
 
 /*-----------------------------------------------------------*/
 
@@ -112,23 +114,23 @@ int main( void )
     vTaskStartScheduler();
 
     return 0;
+
 }
 /*-----------------------------------------------------------*/
 
 static void prvMiscInitialization( void )
 {
     cy_rslt_t result = cybsp_init();
-    if (result != CY_RSLT_SUCCESS)
-    {
-        configPRINTF( (  "BSP initialization failed \r\n" ) );
-    }
+    CY_ASSERT (result == CY_RSLT_SUCCESS);
+
     result = cy_retarget_io_init(CYBSP_DEBUG_UART_TX, CYBSP_DEBUG_UART_RX, CY_RETARGET_IO_BAUDRATE);
-    if (result != CY_RSLT_SUCCESS)
-    {
-        configPRINTF( ( "Retarget IO initializatoin failed \r\n" ) );
-    }
+    CY_ASSERT (result == CY_RSLT_SUCCESS);
+
+    (void) result; /* To avoid compiler warning */
+    
 }
 /*-----------------------------------------------------------*/
+
 void vApplicationDaemonTaskStartupHook( void )
 {
     /* FIX ME: Perform any hardware initialization, that require the RTOS to be
@@ -150,7 +152,7 @@ void vApplicationDaemonTaskStartupHook( void )
         /* Provision the device with AWS certificate and private key. */
         vDevModeKeyProvisioning();
 
-        InitApplication();
+        init_application();
     }
 }
 /*-----------------------------------------------------------*/
@@ -181,7 +183,6 @@ void vApplicationTickHook()
 }
 
 /*-----------------------------------------------------------*/
-
 /**
 * @brief User defined application hook to process names returned by the DNS server.
 */
